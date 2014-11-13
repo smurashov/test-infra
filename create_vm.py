@@ -60,4 +60,5 @@ while nova.servers.get(server.id).status != 'ACTIVE':
     time.sleep(1)
 
 networks = nova.servers.get(server.id).networks
+time.sleep(60)
 print networks[networks.keys()[0]][0]
