@@ -58,3 +58,6 @@ while nova.servers.get(server.id).status != 'ACTIVE':
     if time.time() - start_time > 250:
         raise Exception
     time.sleep(1)
+
+networks = nova.servers.get(server.id).networks
+print networks[networks.keys()[0]][0]
