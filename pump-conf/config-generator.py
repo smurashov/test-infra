@@ -1,4 +1,68 @@
+import argparse
 import yaml
+
+
+parser = argparse.ArgumentParser(description="Yaml generator")
+
+# Source parameters
+
+parser.add_argument("-source_openstack_user", dest='source_openstack_user',
+                    type=str, help="Source OpenStack username",
+                    default='admin')
+
+parser.add_argument("-source_openstack_password",
+                    dest='source_openstack_password',
+                    type=str, help="Source OpenStack password",
+                    default='111')
+
+parser.add_argument("-source_openstack_tenant",
+                    dest='source_openstack_tenant',
+                    type=str, help="Source OpenStack tenant",
+                    default='admin')
+
+parser.add_argument("-source_db_user", dest='source_db_user',
+                    type=str, help="Source MySQL user",
+                    default='root')
+
+parser.add_argument("-source_db_password", dest='source_db_password',
+                    type=str, help="Source MySQL password",
+                    default='111')
+
+parser.add_argument("-source_ip", dest='source_ip',
+                    type=str, help="Source ip",
+                    default='localhost')
+
+# Destination parameters
+
+parser.add_argument("-destination_openstack_user",
+                    dest='destination_openstack_user',
+                    type=str, help="Destination OpenStack username",
+                    default='admin')
+
+parser.add_argument("-destination_openstack_password",
+                    dest='destination_openstack_password',
+                    type=str, help="Destination OpenStack password",
+                    default='111')
+
+parser.add_argument("-destination_openstack_tenant",
+                    dest='destination_openstack_tenant',
+                    type=str, help="Destination OpenStack tenant",
+                    default='admin')
+
+parser.add_argument("-destination_db_user", dest='destination_db_user',
+                    type=str, help="Destination MySQL user",
+                    default='root')
+
+parser.add_argument("-destination_db_password",
+                    dest='destination_db_password',
+                    type=str, help="Destination MySQL password",
+                    default='111')
+
+parser.add_argument("-destination_ip", dest='destination_ip',
+                    type=str, help="Destination ip",
+                    default='localhost')
+
+args = parser.parse_args()
 
 a = {
     "CLOUDS_RESET": True,
@@ -17,17 +81,20 @@ d = {
     "CLOUDS": {
         "source": {
             "endpoint": {
-                "auth_url": "http://localhost:5000/v2.0/",
-                "username": "admin",
-                "password": "111",
-                "tenant_name": "admin"
+                "auth_url": "http://%s:5000/v2.0/" % args.source_ip,
+                "username": args.source_openstack_user,
+                "password": args.source_openstack_password,
+                "tenant_name": args.source_openstack_tenant
             },
             "identity": {
                 "connection":
-                    "mysql+mysqlconnector://user:pass@localhost:3306/keystone"
+                    "mysql+mysqlconnector://%s:%s@%s:3306/keystone" % (
+                        args.source_db_user,
+                        args.source_db_password,
+                        args.source_ip)
             },
             "urls": {
-                "horizon": "http://localhost/"
+                "horizon": "http://%s/" % args.source_ip
             },
             "populate": {
                 "num_servers": 1,
@@ -45,17 +112,20 @@ d = {
         },
         "destination": {
             "endpoint": {
-                "auth_url": "http://localhost:5000/v2.0/",
-                "username": "admin",
-                "password": "111",
-                "tenant_name": "admin"
+                "auth_url": "http://%s:5000/v2.0/" % args.destination_ip,
+                "username": args.destination_openstack_user,
+                "password": args.destination_openstack_password,
+                "tenant_name": args.destination_openstack_tenant
             },
             "identity": {
                 "connection":
-                    "mysql+mysqlconnector://user:pass@localhost:3306/keystone"
+                    "mysql+mysqlconnector://%s:%s@%s:3306/keystone" % (
+                        args.destination_db_user,
+                        args.destination_db_password,
+                        args.destination_ip)
             },
             "urls": {
-                "horizon": "http://localhost/",
+                "horizon": "http://%s/" % args.destination_ip,
                 "mos": "http://127.0.0.1:40000/"
             },
         }
