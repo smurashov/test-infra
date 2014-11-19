@@ -43,6 +43,7 @@ c['change_source'] = []
 
 from buildbot.schedulers.basic import SingleBranchScheduler
 from buildbot.schedulers.forcesched import ForceScheduler
+from buildbot.schedulers.basic import Dependent
 from buildbot.changes import filter
 c['schedulers'] = []
 #c['schedulers'].append(SingleBranchScheduler(
@@ -50,10 +51,19 @@ c['schedulers'] = []
 #                            change_filter=filter.ChangeFilter(branch='master'),
 #                            treeStableTimer=None,
 #                            builderNames=["runtests"]))
-c['schedulers'].append(ForceScheduler(
-                            name="superforce",
-                            builderNames=["deploy_devstack1",
-                                          "deploy_devstack2"]))
+
+deploy_chairs = ForceScheduler(
+    name="superforce",
+    builderNames=["deploy_devstack1", "deploy_devstack2"])
+
+c['schedulers'].append(deploy_chairs)
+
+deploy_component = Dependent(
+    name="superpump",
+    upstream=deploy_chairs,
+    builderNames=["deploy_pumphouse"])
+
+c['schedulers'].append(deploy_component)
 
 ####### BUILDERS
 
@@ -118,6 +128,52 @@ devstack2.addStep(
                   openstack_tenant, keystone_url, image_id, flavor_id,
                  net_id, keypair)]))
 
+pumphouse = BuildFactory()
+
+pumphouse.addStep(Git(repourl='git://github.com/smurashov/test-infra.git',
+                      mode='full'))
+
+pumphouse.addStep(ShellCommand(command=["rm", "-f", "result.yaml"]))
+
+pumphouse.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "python pump-conf/config-generator.py "
+                 "-source_ip `nova --os-username {0} "
+                 "--os-tenant-name {1} "
+                 "--os-auth-url {2} "
+                 "--os-password {3} list | "
+                 "grep cidevstack1 | "
+                 "tr '|' '\n' | grep ci_network | tr '=' '\n' | tail -1` "
+                 "-destination_ip `nova --os-username {0} "
+                 "--os-tenant-name {1} "
+                 "--os-auth-url {2} "
+                 "--os-password {3} list | "
+                 "grep cidevstack2 | "
+                 "tr '|' '\n' | grep ci_network "
+                 "| tr '=' '\n' | tail -1`".format(
+                     openstack_user, openstack_tenant, keystone_url,
+                     openstack_password
+                 )]
+    ))
+
+pumphouse.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "expect deploy-pump.sh ubuntu "
+                 "`python create_vm.py -openstack_user %s "
+                 "-openstack_password %s "
+                 "-openstack_tenant %s "
+                 "-keystone_url %s "
+                 "-server_name cipumphouse "
+                 "-image_id %s "
+                 "-flavor_id %s "
+                 "-net_id %s "
+                 "-keypair %s`" %
+                 (openstack_user, openstack_password,
+                  openstack_tenant, keystone_url, image_id, flavor_id,
+                 net_id, keypair)]))
+
 from buildbot.config import BuilderConfig
 
 c['builders'] = []
@@ -129,6 +185,10 @@ c['builders'].append(
     BuilderConfig(name="deploy_devstack2",
       slavenames=["myslave"],
       factory=devstack2))
+c['builders'].append(
+    BuilderConfig(name="deploy_pumphouse",
+      slavenames=["myslave"],
+      factory=pumphouse))
 
 ####### STATUS TARGETS
 
@@ -145,13 +205,13 @@ authz_cfg=authz.Authz(
     # change any of these to True to enable; see the manual for more
     # options
     auth=auth.BasicAuth([("superman","swordfish")]),
-    gracefulShutdown = False,
-    forceBuild = auth, # use this to test your slave once it is set up
-    forceAllBuilds = auth,
-    pingBuilder = False,
-    stopBuild = False,
-    stopAllBuilds = False,
-    cancelPendingBuild = False,
+    gracefulShutdown=False,
+    forceBuild=auth,  # use this to test your slave once it is set up
+    forceAllBuilds=auth,
+    pingBuilder=False,
+    stopBuild=False,
+    stopAllBuilds=False,
+    cancelPendingBuild=False,
 )
 c['status'].append(html.WebStatus(http_port=8010, authz=authz_cfg))
 
