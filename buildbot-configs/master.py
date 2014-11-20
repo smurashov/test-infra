@@ -83,6 +83,7 @@ image_id = "IMAGE_ID"
 flavor_id = "FLAVOR_ID"
 net_id = "NET_ID"
 keypair = "KEYPAIR"
+pump_flavor_id = "FLAVOR_ID"
 
 devstack1 = BuildFactory()
 
@@ -171,7 +172,7 @@ pumphouse.addStep(
                  "-net_id %s "
                  "-keypair %s`" %
                  (openstack_user, openstack_password,
-                  openstack_tenant, keystone_url, image_id, flavor_id,
+                  openstack_tenant, keystone_url, image_id, pump_flavor_id,
                  net_id, keypair)]))
 
 from buildbot.config import BuilderConfig
