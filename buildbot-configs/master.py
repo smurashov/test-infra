@@ -113,7 +113,7 @@ devstack1.addStep(
                  "-keypair %s`" %
                  (openstack_user, openstack_password,
                   openstack_tenant, keystone_url, image_id, flavor_id,
-                 net_id, keypair)]))
+                 net_id, keypair)], timeout=2000))
 
 devstack2 = BuildFactory()
 
@@ -135,7 +135,7 @@ devstack2.addStep(
                  "-keypair %s`" %
                  (openstack_user, openstack_password,
                   openstack_tenant, keystone_url, image_id, flavor_id,
-                 net_id, keypair)]))
+                 net_id, keypair)], timeout=2000))
 
 pumphouse = BuildFactory()
 
@@ -163,7 +163,7 @@ pumphouse.addStep(
                  "| tr '=' '\n' | tail -1`".format(
                      openstack_user, openstack_tenant, keystone_url,
                      openstack_password
-                 )]
+                 )], timeout=2000
     ))
 
 pumphouse.addStep(
@@ -181,7 +181,7 @@ pumphouse.addStep(
                  "-keypair %s`" %
                  (openstack_user, openstack_password,
                   openstack_tenant, keystone_url, image_id, pump_flavor_id,
-                 net_id, keypair)]))
+                 net_id, keypair)], timeout=2000))
 
 functests = BuildFactory()
 
@@ -218,7 +218,7 @@ functests.addStep(
                  "tr '|' '\n' | grep ci_network "
                  "| tr '=' '\n' | tail -1`".format(
                      openstack_user, openstack_tenant, keystone_url,
-                     openstack_password)]
+                     openstack_password)], timeout=3000
     )
 )
 
