@@ -52,8 +52,16 @@ c['schedulers'] = []
 #                            treeStableTimer=None,
 #                            builderNames=["runtests"]))
 
-deploy_chairs = ForceScheduler(
-    name="superforce",
+clean_trash = ForceScheduler(
+    name="mrproper",
+    builderNames=["remove_vms"]
+)
+
+c['schedulers'].append(clean_trash)
+
+deploy_chairs = Dependent(
+    name="superdevstack",
+    upstream=clean_trash,
     builderNames=["deploy_devstack1", "deploy_devstack2"])
 
 c['schedulers'].append(deploy_chairs)
@@ -92,6 +100,23 @@ flavor_id = "FLAVOR_ID"
 net_id = "NET_ID"
 keypair = "KEYPAIR"
 pump_flavor_id = "FLAVOR_ID"
+
+clean_vms = BuildFactory()
+
+clean_vms.addStep(Git(repourl='git://github.com/smurashov/test-infra.git',
+                      mode='full'))
+
+clean_vms.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "python clean_all.py -openstack_user %s "
+                 "-openstack_password %s "
+                 "-openstack_tenant %s "
+                 "-keystone_url %s" % (openstack_user,
+                                       openstack_password,
+                                       openstack_tenant,
+                                       keystone_url)]
+    ))
 
 devstack1 = BuildFactory()
 
@@ -241,6 +266,11 @@ c['builders'].append(
     BuilderConfig(name="run_func_tests",
                   slavenames=["myslave"],
                   factory=functests))
+c['builders'].append(
+    BuilderConfig(name="remove_vms",
+                  slavenames=["myslave"],
+                  factory=clean_vms)
+)
 
 ####### STATUS TARGETS
 
