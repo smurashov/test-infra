@@ -65,6 +65,14 @@ deploy_component = Dependent(
 
 c['schedulers'].append(deploy_component)
 
+run_func_tests = Dependent(
+    name="superfunctests",
+    upstream=deploy_component,
+    builderNames=["run_func_tests"]
+)
+
+c['schedulers'].append(run_func_tests)
+
 ####### BUILDERS
 
 # The 'builders' list defines the Builders, which tell Buildbot how to perform a build:
@@ -175,21 +183,64 @@ pumphouse.addStep(
                   openstack_tenant, keystone_url, image_id, pump_flavor_id,
                  net_id, keypair)]))
 
+functests = BuildFactory()
+
+functests.addStep(Git(repourl='git://github.com/smurashov/test-infra.git',
+                      mode='full'))
+
+functests.addStep(ShellCommand(command=["rm", "-f", "config.js"]))
+
+functests.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "python test_config.py "
+                 "-pumphouse_url `nova --os-username {0} "
+                 "--os-tenant-name {1} "
+                 "--os-auth-url {2} "
+                 "--os-password {3} list | "
+                 "grep cipumphouse | "
+                 "tr '|' '\n' | grep ci_network "
+                 "| tr '=' '\n' | tail -1`".format(
+                     openstack_user, openstack_tenant, keystone_url,
+                     openstack_password
+                 )]
+    ))
+
+functests.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "expect prepare-and-run-functests.sh ubuntu "
+                 "`nova --os-username {0} "
+                 "--os-tenant-name {1} "
+                 "--os-auth-url {2} "
+                 "--os-password {3} list | "
+                 "grep cipumphouse | "
+                 "tr '|' '\n' | grep ci_network "
+                 "| tr '=' '\n' | tail -1`".format(
+                     openstack_user, openstack_tenant, keystone_url,
+                     openstack_password)]
+    )
+)
+
 from buildbot.config import BuilderConfig
 
 c['builders'] = []
 c['builders'].append(
     BuilderConfig(name="deploy_devstack1",
-      slavenames=["myslave"],
-      factory=devstack1))
+                  slavenames=["myslave"],
+                  factory=devstack1))
 c['builders'].append(   
     BuilderConfig(name="deploy_devstack2",
-      slavenames=["myslave"],
-      factory=devstack2))
+                  slavenames=["myslave"],
+                  factory=devstack2))
 c['builders'].append(
     BuilderConfig(name="deploy_pumphouse",
-      slavenames=["myslave"],
-      factory=pumphouse))
+                  slavenames=["myslave"],
+                  factory=pumphouse))
+c['builders'].append(
+    BuilderConfig(name="run_func_tests",
+                  slavenames=["myslave"],
+                  factory=functests))
 
 ####### STATUS TARGETS
 
@@ -205,7 +256,7 @@ from buildbot.status.web import authz, auth
 authz_cfg=authz.Authz(
     # change any of these to True to enable; see the manual for more
     # options
-    auth=auth.BasicAuth([("superman","swordfish")]),
+    auth=auth.BasicAuth([("superman", "swordfish")]),
     gracefulShutdown=False,
     forceBuild=auth,  # use this to test your slave once it is set up
     forceAllBuilds=auth,

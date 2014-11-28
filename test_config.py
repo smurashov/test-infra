@@ -15,7 +15,7 @@ with open('config.js', 'w') as config:
 
     config.write(
         "module.exports = {\n")
-    config.write("    endpoint: '%s',\n" % args.pumphouse_url)
+    config.write("    endpoint: 'http://%s:5000',\n" % args.pumphouse_url)
     config.write("    timeout: 2500,\n")
     config.write("    cases: [\n")
     config.write("        'reset',\n        'migrate'\n    ],\n")
