@@ -101,12 +101,14 @@ d = {
                 "num_tenants": 1
             },
             "workloads": {
-                "flavors": {
-                    "name": "pumphouse--flavor",
-                    "ram": 64,
-                    "vcpu": 1,
-                    "disk": 0
-                }
+                "flavors": [
+                    {
+                        "name": "pumphouse--flavor",
+                        "ram": 64,
+                        "vcpu": 1,
+                        "disk": 0
+                    }
+                ]
             },
 
         },
