@@ -261,8 +261,8 @@ authz_cfg=authz.Authz(
     forceBuild=auth,  # use this to test your slave once it is set up
     forceAllBuilds=auth,
     pingBuilder=False,
-    stopBuild=False,
-    stopAllBuilds=False,
+    stopBuild=auth,
+    stopAllBuilds=auth,
     cancelPendingBuild=False,
 )
 c['status'].append(html.WebStatus(http_port=8010, authz=authz_cfg))
