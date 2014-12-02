@@ -14,7 +14,8 @@ class NailgunClient(object):
         self.url = "http://{0}:8000".format(admin_node_ip)
         keystone_url = "http://{0}:5000/v2.0".format(admin_node_ip)
         ksclient = keystoneclient(auth_url=keystone_url, **kwargs)
-        self.headers = {"X-Auth-Token": ksclient.auth_token}
+        self.headers = {"X-Auth-Token": ksclient.auth_token,
+                        "Content-Type": "application/json"}
 
     def _get_cluster_list(self):
         endpoint = urlparse.urljoin(self.url, "api/clusters")
@@ -45,7 +46,8 @@ class NailgunClient(object):
 
     def _create_cluster(self, data):
         endpoint = urlparse.urljoin(self.url, "api/clusters")
-        return requests.post(endpoint, headers=self.headers, data=data)
+        return requests.post(endpoint, headers=self.headers,
+                             data=json.dumps(data))
 
     def list_cluster_nodes(self, cluster_id):
         endpoint = urlparse.urljoin(
@@ -55,11 +57,13 @@ class NailgunClient(object):
     def update_cluster_attributes(self, cluster_id, attrs):
         endpoint = urlparse.urljoin(
             self.url, "api/clusters/{}/attributes".format(cluster_id))
-        return requests.put(endpoint, headers=self.headers, data=attrs)
+        return requests.put(endpoint, headers=self.headers,
+                            data=json.dumps(attrs))
 
     def update_node(self, node_id, data):
         endpoint = urlparse.urljoin(self.url, "api/nodes/{}".format(node_id))
-        return requests.put(endpoint, headers=self.headers, data=data)
+        return requests.put(endpoint, headers=self.headers,
+                            data=json.dumps(data))
 
     def get_node_interfaces(self, node_id):
         endpoint = urlparse.urljoin(self.url,
@@ -73,7 +77,8 @@ class NailgunClient(object):
         :return: response
         """
         endpoint = urlparse.urljoin(self.url, "api/nodes/interfaces")
-        return requests.put(endpoint, headers=self.headers, data=data)
+        return requests.put(endpoint, headers=self.headers,
+                            data=json.dumps(data))
 
     def update_cluster_networks(self, cluster_id, data):
         net_provider = self._get_cluster(cluster_id)["net_provider"]
@@ -81,7 +86,8 @@ class NailgunClient(object):
             self.url,
             "api/clusters/{}/network_configuration/{}".format(cluster_id,
                                                               net_provider))
-        return requests.put(endpoint, headers=self.headers, data=data)
+        return requests.put(endpoint, headers=self.headers,
+                            data=json.dumps(data))
 
     def get_node_disks(self, node_id):
         endpoint = urlparse.urljoin(self.url,
@@ -91,7 +97,16 @@ class NailgunClient(object):
     def put_node_disks(self, node_id, data):
         endpoint = urlparse.urljoin(self.url,
                                     "api/nodes/{}/disks".format(node_id))
-        return requests.put(endpoint, headers=self.headers, data=data)
+        return requests.put(endpoint, headers=self.headers,
+                            data=json.dumps(data))
+
+
+def get_cluster_id(cluster_name):
+    for cluster in client._get_cluster_list():
+        if cluster["name"] == cluster_name:
+            return cluster["id"]
+    else:
+        raise NameError("Can not find cluster with specified name")
 
 
 parser = argparse.ArgumentParser(
@@ -128,12 +143,7 @@ client = NailgunClient(args.admin_node_ip, username=args.fuel_user,
                        tenant_name=args.fuel_tenant)
 
 if args.dump_cluster:
-    for cluster in client._get_cluster_list():
-        if cluster["name"] == args.dump_cluster:
-            cluster_id = cluster["id"]
-            break
-    else:
-        raise NameError("Can not find cluster with specified name")
+    cluster_id = get_cluster_id(args.dump_cluster)
 
     if args.dump_folder:
         if not os.path.exists(args.dump_folder):
@@ -174,3 +184,35 @@ if args.dump_cluster:
                 "w") as node_disks:
             json.dump(client.get_node_disks(node["id"]), node_disks,
                       sort_keys=False, indent=4)
+
+if args.restore_cluster:
+    if not os.path.exists(args.restore_cluster):
+        raise NameError("This folder does not exist")
+
+    folder = args.restore_cluster
+
+    if os.path.isfile("{}/cluster.json".format(folder)):
+        with open("{}/cluster.json".format(folder)) as cluster:
+            cluster_data = json.load(cluster)
+
+        new_cluster_data = {
+            "name": cluster_data["name"],
+            "release": cluster_data["release_id"],
+            "mode": cluster_data["mode"],
+            "net_provider": cluster_data["net_provider"]
+        }
+        if cluster_data.get("net_segment_type"):
+            new_cluster_data["net_segment_type"] = cluster_data[
+                "net_segment_data"]
+
+        new_clust = client._create_cluster(new_cluster_data).json()
+    else:
+        raise NameError("Can not find cluster.json")
+
+    if os.path.isfile("{}/cluster_attributes.json".format(folder)):
+        with open(
+                "{}/cluster_attributes.json".format(folder)) as cluster_attrs:
+            cluster_attrs_data = json.load(cluster_attrs)
+
+        new_cluster_attrs = client.update_cluster_attributes(
+            new_clust["id"], cluster_attrs_data)
