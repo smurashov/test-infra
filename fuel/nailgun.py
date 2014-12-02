@@ -1,6 +1,9 @@
+import argparse
 import requests
 import urlparse
+import os
 import json
+
 
 from keystoneclient.v2_0 import Client as keystoneclient
 
@@ -89,3 +92,85 @@ class NailgunClient(object):
         endpoint = urlparse.urljoin(self.url,
                                     "api/nodes/{}/disks".format(node_id))
         return requests.put(endpoint, headers=self.headers, data=data)
+
+
+parser = argparse.ArgumentParser(
+    description="Script for dump/restore cluster config")
+parser.add_argument('admin_node_ip', metavar='10.20.0.2', type=str,
+                    help='IP of fuel master node')
+
+parser.add_argument("-fuel_user",  dest='fuel_user',  type=str,
+                    help="Fuel username",  default='admin')
+
+parser.add_argument("-fuel_password",  dest='fuel_password',
+                    type=str, help="Fuel password",
+                    default='admin')
+
+parser.add_argument("-fuel_tenant",  dest='fuel_tenant',  type=str,
+                    help="Fuel tenant",  default='admin')
+
+parser.add_argument('-dump_cluster', dest='dump_cluster', type=str,
+                    default="",
+                    help='Name of cluster which configuration need to dump')
+
+parser.add_argument("-dump_folder", dest="dump_folder", type=str,
+                    default="",
+                    help="Folder where cluster config will store")
+
+parser.add_argument("-restore_cluster", dest="restore_cluster", type=str,
+                    default="",
+                    help="Folder which contains cluster config")
+
+args = parser.parse_args()
+
+client = NailgunClient(args.admin_node_ip, username=args.fuel_user,
+                       password=args.fuel_password,
+                       tenant_name=args.fuel_tenant)
+
+if args.dump_cluster:
+    for cluster in client._get_cluster_list():
+        if cluster["name"] == args.dump_cluster:
+            cluster_id = cluster["id"]
+            break
+    else:
+        raise NameError("Can not find cluster with specified name")
+
+    if args.dump_folder:
+        if not os.path.exists(args.dump_folder):
+            os.makedirs(args.dump_folder)
+            folder = args.dump_folder
+    else:
+        os.makedirs(args.dump_cluster)
+        folder = args.dump_cluster
+
+    with open("{}/cluster.json".format(folder), "w") as cluster:
+        json.dump(client._get_cluster(cluster_id), cluster, sort_keys=False,
+                  indent=4)
+
+    with open("{}/cluster_attributes.json".format(folder),
+              "w") as cluster_attrs:
+        json.dump(client._get_cluster_attributes(cluster_id), cluster_attrs,
+                  sort_keys=False, indent=4)
+
+    with open("{}/cluster_networks.json".format(folder), "w") as cluster_net:
+        json.dump(client._get_list_networks(cluster_id), cluster_net,
+                  sort_keys=False, indent=4)
+
+    for node in client.list_cluster_nodes(cluster_id):
+        with open("{}/node-{}.json".format(folder, node["id"]),
+                  "w") as node_cfg:
+            json.dump(node, node_cfg, sort_keys=False, indent=4)
+
+        with open(
+                "{}/node-{}-networks.json".format(folder,
+                                                  node["id"]),
+                "w") as node_net:
+            json.dump(client.get_node_interfaces(node["id"]), node_net,
+                      sort_keys=False, indent=4)
+
+        with open(
+                "{}/node-{}-disks.json".format(folder,
+                                               node["id"]),
+                "w") as node_disks:
+            json.dump(client.get_node_disks(node["id"]), node_disks,
+                      sort_keys=False, indent=4)
