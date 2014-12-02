@@ -59,6 +59,13 @@ clean_trash = ForceScheduler(
 
 c['schedulers'].append(clean_trash)
 
+clean_trash_neutron = ForceScheduler(
+    name="mrproper_neutron",
+    builderNames=["remove_vms"]
+)
+
+c['schedulers'].append(clean_trash_neutron)
+
 deploy_chairs = Dependent(
     name="superdevstack",
     upstream=clean_trash,
@@ -66,12 +73,28 @@ deploy_chairs = Dependent(
 
 c['schedulers'].append(deploy_chairs)
 
+deploy_chairs_neutron = Dependent(
+    name="superdevstack_neutron",
+    upstream=clean_trash_neutron,
+    builderNames=["deploy_devstack1_neutron", "deploy_devstack2_neutron"]
+)
+
+c['schedulers'].append(deploy_chairs_neutron)
+
 deploy_component = Dependent(
     name="superpump",
     upstream=deploy_chairs,
     builderNames=["deploy_pumphouse"])
 
 c['schedulers'].append(deploy_component)
+
+deploy_component_neutron = Dependent(
+    name="superpump_neutron",
+    upstream=deploy_chairs_neutron,
+    builderNames=["deploy_pumphouse"]
+)
+
+c['schedulers'].append(deploy_component_neutron)
 
 run_func_tests = Dependent(
     name="superfunctests",
@@ -247,6 +270,50 @@ functests.addStep(
     )
 )
 
+devstack1_neutron = BuildFactory()
+
+devstack1_neutron.addStep(
+    Git(repourl='git://github.com/smurashov/test-infra.git', mode='full'))
+
+devstack1_neutron.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "expect deploy-devstack-neutron.sh ubuntu "
+                 "`python create_vm.py -openstack_user %s "
+                 "-openstack_password %s "
+                 "-openstack_tenant %s "
+                 "-keystone_url %s "
+                 "-server_name cidevstack1 "
+                 "-image_id %s "
+                 "-flavor_id %s "
+                 "-net_id %s "
+                 "-keypair %s`" %
+                 (openstack_user, openstack_password,
+                  openstack_tenant, keystone_url, image_id, flavor_id,
+                 net_id, keypair)], timeout=2000))
+
+devstack2_neutron = BuildFactory()
+
+devstack2_neutron.addStep(
+    Git(repourl='git://github.com/smurashov/test-infra.git', mode='full'))
+
+devstack2_neutron.addStep(
+    ShellCommand(
+        command=["bash", "-c",
+                 "expect deploy-devstack-neutron.sh ubuntu "
+                 "`python create_vm.py -openstack_user %s "
+                 "-openstack_password %s "
+                 "-openstack_tenant %s "
+                 "-keystone_url %s "
+                 "-server_name cidevstack2 "
+                 "-image_id %s "
+                 "-flavor_id %s "
+                 "-net_id %s "
+                 "-keypair %s`" %
+                 (openstack_user, openstack_password,
+                  openstack_tenant, keystone_url, image_id, flavor_id,
+                 net_id, keypair)], timeout=2000))
+
 from buildbot.config import BuilderConfig
 
 c['builders'] = []
@@ -270,6 +337,16 @@ c['builders'].append(
     BuilderConfig(name="remove_vms",
                   slavenames=["myslave"],
                   factory=clean_vms)
+)
+c['builders'].append(
+    BuilderConfig(name="deploy_devstack1_neutron",
+                  slavenames=["myslave"],
+                  factory=devstack1_neutron)
+)
+c['builders'].append(
+    BuilderConfig(name="deploy_devstack2_neutron",
+                  slavenames=["myslave"],
+                  factory=devstack2_neutron)
 )
 
 ####### STATUS TARGETS
