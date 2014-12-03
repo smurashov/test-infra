@@ -216,3 +216,26 @@ if args.restore_cluster:
 
         new_cluster_attrs = client.update_cluster_attributes(
             new_clust["id"], cluster_attrs_data)
+
+    if os.path.isfile("{}/cluster_networks.json".format(folder)):
+        with open("{}/cluster_networks.json".format(folder)) as cluster_nets:
+            cluster_nets_data = json.load(cluster_nets)
+
+        restore_cluster_nets_data = client._get_list_networks(new_clust["id"])
+        for key, value in cluster_nets_data["networking_parameters"].items():
+            if key == "base_mac":
+                continue
+            restore_cluster_nets_data["networking_parameters"][key] = value
+
+        for net in cluster_nets_data["networks"]:
+            if net["name"] == "fuelweb_admin":
+                continue
+            for new_net in restore_cluster_nets_data["networks"]:
+                if net["name"] == new_net["name"]:
+                    for key, value in net.items():
+                        if key in ["cluster_id", "id"]:
+                            continue
+                        new_net[key] = value
+
+        client.update_cluster_networks(new_clust["id"],
+                                       restore_cluster_nets_data)
