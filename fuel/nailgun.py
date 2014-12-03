@@ -1,4 +1,5 @@
 import argparse
+import re
 import requests
 import urlparse
 import os
@@ -239,3 +240,90 @@ if args.restore_cluster:
 
         client.update_cluster_networks(new_clust["id"],
                                        restore_cluster_nets_data)
+
+    _nodes = re.compile('-(\d+)\.json$')
+    nodes = [
+        node.split('.')[0]
+        for node in os.listdir(folder) if _nodes.search(node)]
+
+    for node in nodes:
+        with open("{}/{}.json".format(folder, node)) as node_base:
+            node_base_cfg = json.load(node_base)
+
+        available_nodes = [nod for nod in client._get_list_nodes()
+                           if not nod["cluster"] and nod["online"]]
+        for available_node in available_nodes:
+            if (node_base_cfg["manufacturer"] !=
+                    available_node["manufacturer"]):
+                continue
+
+            if os.path.isfile("{}/{}-networks.json".format(folder, node)):
+                with open("{}/{}-networks.json".format(
+                        folder, node)) as node_net:
+                    node_net_cfg = json.load(node_net)
+
+                new_interfaces = client.get_node_interfaces(
+                    available_node["id"])
+
+                if len(node_net_cfg) != len(new_interfaces):
+                    continue
+
+            if os.path.isfile("{}/{}-disks.json".format(folder, node)):
+                with open("{}/{}-disks.json".format(
+                        folder, node)) as node_disks:
+                    node_disk_cfg = json.load(node_disks)
+
+                new_disks = client.get_node_disks(available_node["id"])
+
+                if len(node_disk_cfg) != len(new_disks):
+                    continue
+                good_disks = []
+                for disk in sorted(node_disk_cfg,
+                                   key=lambda k: k['size'], reverse=True):
+                    needed_size = 0
+                    for volume in disk["volumes"]:
+                        needed_size += volume["size"]
+                    for new_disk in new_disks:
+                        if needed_size <= new_disk["size"]:
+                            new_disk["volumes"] = disk["volumes"]
+                            appr_disk = new_disk
+                            break
+                    else:
+                        raise Exception("All disks are to small")
+                    good_disks.append(new_disks.pop(
+                        new_disks.index(appr_disk)))
+
+            good_node = available_node
+            break
+        else:
+            raise Exception("Can not find appropriate node")
+
+        data = {
+            "cluster_id": new_clust["id"],
+            "pending_roles": node_base_cfg["pending_roles"],
+            "pending_addition": True,
+        }
+        client.update_node(good_node["id"], data)
+
+        if os.path.isfile("{}/{}-networks.json".format(folder, node)):
+            all_nets = {}
+            new_interfaces = client.get_node_interfaces(good_node["id"])
+            for netw in new_interfaces:
+                all_nets.update(
+                    {net["name"]: net for net in netw["assigned_networks"]})
+            for interface in node_net_cfg:
+                for new_interface in new_interfaces:
+                    if interface["name"] == new_interface["name"]:
+                        ass_interfaces = [
+                            all_nets[i["name"]] for i in interface[
+                                "assigned_networks"]]
+                        new_interface["assigned_networks"] = ass_interfaces
+
+            resp = client.put_node_interfaces(
+                [{"id": good_node["id"], "interfaces": new_interfaces}]
+            )
+            print resp
+            print resp.content
+
+        if os.path.isfile("{}/{}-disks.json".format(folder, node)):
+            resp = client.put_node_disks(good_node["id"], good_disks)
