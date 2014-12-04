@@ -205,6 +205,18 @@ if args.restore_cluster:
         if cluster_data.get("net_segment_type"):
             new_cluster_data["net_segment_type"] = cluster_data[
                 "net_segment_data"]
+        elif os.path.isfile("{}/cluster_networks.json".format(folder)):
+            with open(
+                    "{}/cluster_networks.json".format(folder)) as cluster_nets:
+                cluster_nets_data = json.load(cluster_nets)
+                if cluster_data["net_provider"] == "neutron":
+                    new_cluster_data["net_segment_type"] = \
+                        cluster_nets_data["networking_parameters"][
+                            "segmentation_type"]
+                else:
+                    new_cluster_data["net_manager"] = \
+                        cluster_nets_data["networking_parameters"][
+                            "net_manager"]
 
         new_clust = client._create_cluster(new_cluster_data).json()
     else:
