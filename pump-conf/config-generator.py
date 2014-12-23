@@ -123,8 +123,8 @@ d = {
     }
 }
 
-with open('result.yaml', 'w') as yaml_file:
+with open('api-config.yaml', 'w') as yaml_file:
     yaml_file.write(yaml.dump(a, default_flow_style=False))
 
-with open('result.yaml', 'a') as yaml_file:
+with open('api-config.yaml', 'a') as yaml_file:
     yaml_file.write(yaml.dump(d, default_flow_style=False))
