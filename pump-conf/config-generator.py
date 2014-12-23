@@ -100,17 +100,6 @@ d = {
                 "num_servers": 1,
                 "num_tenants": 1
             },
-            "workloads": {
-                "flavors": [
-                    {
-                        "name": "pumphouse--flavor",
-                        "ram": 64,
-                        "vcpu": 1,
-                        "disk": 0
-                    }
-                ]
-            },
-
         },
         "destination": {
             "endpoint": {
